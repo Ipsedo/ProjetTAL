@@ -37,9 +37,9 @@ if __name__ == "__main__":
     X = prep_data.to_long_tensor(sents_idx)
     Y = prep_data.to_long_tensor(ints_idx)
 
-    m = ModelConv(len(voc_sents), max_len_sents, nb_ints)
+    m = ModelConv(len(voc_sents), max_len_sents, nb_ints, voc_sents[prep_data.padding_sents])
     loss_fn = nn.CrossEntropyLoss()
-    optim = th.optim.Adagrad(m.parameters(), lr=1e-1)
+    optim = th.optim.Adagrad(m.parameters(), lr=1e-3)
 
     nb_epoch = 10
     batch_size = 32
