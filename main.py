@@ -10,9 +10,6 @@ if __name__ == "__main__":
 
     nb_ints = len(set(ints))
 
-    """max_len_sents = prep_data.get_max_len(sents)
-    max_len_ners = prep_data.get_max_len(ners)
-    assert(max_len_sents == max_len_ners)"""
     max_len_sents = 100
 
     print(max_len_sents)
@@ -42,9 +39,27 @@ if __name__ == "__main__":
 
     m = ModelConv(len(voc_sents), max_len_sents, nb_ints)
     loss_fn = nn.CrossEntropyLoss()
-    optim = th.optim.SGD(m.parameters(), lr=1e-3)
+    optim = th.optim.Adagrad(m.parameters(), lr=1e-1)
 
-    out = m(X[0:10])
-    loss = loss_fn(out, Y[0:10])
-    loss.backward()
-    optim.step()
+    nb_epoch = 10
+    batch_size = 32
+    nb_batch = int(X.size(0) / batch_size)
+
+    for e in range(nb_epoch):
+        sum_loss = 0
+        for i in range(nb_batch):
+            i_min = i * batch_size
+            i_max = (i + 1) * batch_size
+            i_max = i_max if i_max < X.size(0) else X.size(0)
+
+            x = X[i_min:i_max]
+            y = Y[i_min:i_max]
+
+            optim.zero_grad()
+
+            out = m(x)
+            loss = loss_fn(out, y)
+            optim.step()
+
+            sum_loss += loss.item()
+        print("Epoch %s, loss = %f" % (e, sum_loss / nb_batch))
