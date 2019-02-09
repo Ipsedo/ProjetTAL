@@ -31,11 +31,11 @@ class ModelConv_old(nn.Module):
 
 
 class Embedding(nn.Module):
-    def __init__(self, vocab_size, emb_size=16):
+    def __init__(self, vocab_size, padding_idx, emb_size=16):
         super(Embedding, self).__init__()
         self.emb_size = emb_size
         self.vocab_size = vocab_size
-        self.emb = nn.Embedding(self.vocab_size, self.emb_size)
+        self.emb = nn.Embedding(self.vocab_size, self.emb_size, padding_idx=padding_idx)
 
     def forward(self, x):
         return self.emb(x)
@@ -62,8 +62,9 @@ class DoubleLSTM(nn.Module):
         self.lin = nn.Linear(self.hidden_size * 4, self.out_class)
 
     def forward(self, x):
-        o1, _ = self.lstm_1(x, (self.fst_h_1, self.fst_c_1))
-        o2, _ = self.lstm_2(o1, (self.fst_h_2, self.fst_c_2))
+        s = x.size(0)
+        o1, _ = self.lstm_1(x, (self.fst_h_1[:, :s, :], self.fst_c_1[:, :s, :]))
+        o2, _ = self.lstm_2(o1, (self.fst_h_2[:, :s, :], self.fst_c_2[:, :s, :]))
         o3 = self.lin(o2)
         return o3
 
@@ -84,12 +85,12 @@ class ConvModel(nn.Module):
 
 
 class SuperNN(nn.Module):
-    def __init__(self, seq_length, vocab_size, batch_size, word_out_class, seq_out_class):
+    def __init__(self, seq_length, vocab_size, batch_size, word_out_class, seq_out_class, padding_idx):
         super(SuperNN, self).__init__()
 
         self.size_seq_pred = (seq_length + 1) * word_out_class
 
-        self.emb = Embedding(vocab_size)
+        self.emb = Embedding(vocab_size, padding_idx)
         self.lstm = DoubleLSTM(seq_length, batch_size, word_out_class)
         self.conv = ConvModel(seq_length, word_out_class)
 
