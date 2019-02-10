@@ -4,7 +4,6 @@ from models.models import SuperNN
 import torch as th
 import torch.nn as nn
 
-
 if __name__ == "__main__":
     sents, ners, ints = load_file.readatis('data-atis/all_atis.iob')
 
@@ -38,13 +37,24 @@ if __name__ == "__main__":
     Y_ints = prep_data.to_long_tensor(ints_idx)
     Y_ners = prep_data.to_long_tensor(ners_idx)
 
+    nb_train = 3500
+    nb_dev = 800
+
+    X_train = X[:nb_train]
+    Y_ints_train = Y_ints[:nb_train]
+    Y_ners_train = Y_ners[:nb_train]
+
+    X_dev = X[nb_train:nb_train+nb_dev]
+    Y_ints_dev = Y_ints[nb_train:nb_train+nb_dev]
+    Y_ners_dev = Y_ners[nb_train:nb_train+nb_dev]
+
     print(X.size())
     print(Y_ints.size())
     print(Y_ners.size())
 
     nb_epoch = 10
     batch_size = 32
-    nb_batch = int(X.size(0) / batch_size)
+    nb_batch = int(X_train.size(0) / batch_size)
 
     #m = ModelConv(len(voc_sents), max_len_sents, nb_ints, voc_sents[prep_data.padding_sents])
     m = SuperNN(max_len_sents, len(voc_sents), batch_size, len(voc_ners), len(voc_ints), voc_sents[prep_data.padding_sents])
@@ -59,11 +69,11 @@ if __name__ == "__main__":
         for i in range(nb_batch):
             i_min = i * batch_size
             i_max = (i + 1) * batch_size
-            i_max = i_max if i_max < X.size(0) else X.size(0)
+            i_max = i_max if i_max < X_train.size(0) else X_train.size(0)
 
-            x = X[i_min:i_max]
-            y_ints = Y_ints[i_min:i_max]
-            y_ners = Y_ners[i_min:i_max]
+            x = X_train[i_min:i_max]
+            y_ints = Y_ints_train[i_min:i_max]
+            y_ners = Y_ners_train[i_min:i_max].view(-1)
 
             optim.zero_grad()
 
@@ -72,11 +82,11 @@ if __name__ == "__main__":
             loss_ints = loss_fn_ints(out_ints, y_ints)
             loss_ints.backward(retain_graph=True)
 
-            optim.step()
+            # optim.step()
 
-            optim.zero_grad()
-
-            loss_ners = loss_fn_ners(out_ners.view(-1, len(voc_ners)), y_ners.view(-1))
+            # optim.zero_grad()
+            index = y_ners != voc_ners[prep_data.padding_ners]
+            loss_ners = loss_fn_ners(out_ners.view(-1, len(voc_ners))[index, :], y_ners[index])
             loss_ners.backward()
 
             optim.step()
@@ -84,3 +94,36 @@ if __name__ == "__main__":
             sum_loss_ints += loss_ints.item()
             sum_loss_ners += loss_ners.item()
         print("Epoch %s, loss_ints = %f, loss_ners = %f" % (e, sum_loss_ints / nb_batch, sum_loss_ners / nb_batch))
+
+        m.eval()
+        sum_ints = 0
+        sum_ners = 0
+
+        nb_batch_dev = int(nb_dev / batch_size)
+
+        for i in range(nb_batch_dev):
+            i_min = i * batch_size
+            i_max = (i + 1) * batch_size
+            i_max = i_max if i_max < X_dev.size(0) else X_dev.size(0)
+
+            x = X_dev[i_min:i_max]
+            ners = Y_ners_dev[i_min:i_max].view(-1)
+            ints = Y_ints_dev[i_min:i_max]
+
+            out_ners, out_ints = m(x)
+
+            out_ners = out_ners.view(-1, len(voc_ners)).argmax(dim=1)
+            out_ints = out_ints.argmax(dim=1)
+
+            index = ners != voc_ners[prep_data.padding_ners]
+            tmp = out_ners[index] == ners[index]
+            nb_correct_ners = tmp.sum().item() / ners[index].size(0)
+
+            nb_correct_ints = (out_ints == ints).sum().item()
+
+            sum_ints += nb_correct_ints
+            sum_ners += nb_correct_ners
+
+        print("Dev results : ners = %f, ints = %f" % (sum_ners / nb_batch_dev, sum_ints / nb_dev))
+
+
