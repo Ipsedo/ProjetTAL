@@ -31,7 +31,7 @@ class ModelConv_old(nn.Module):
 
 
 class Embedding(nn.Module):
-    def __init__(self, vocab_size, padding_idx, emb_size=16):
+    def __init__(self, vocab_size, padding_idx, emb_size=128):
         super(Embedding, self).__init__()
         self.emb_size = emb_size
         self.vocab_size = vocab_size
@@ -42,7 +42,7 @@ class Embedding(nn.Module):
 
 
 class DoubleLSTM(nn.Module):
-    def __init__(self, seq_length, batch_size, out_class, emb_size=16, hidden_size=24):
+    def __init__(self, seq_length, batch_size, out_class, emb_size=128, hidden_size=64):
         super(DoubleLSTM, self).__init__()
 
         self.seq_length = seq_length
@@ -51,30 +51,24 @@ class DoubleLSTM(nn.Module):
         self.out_class = out_class
 
         self.lstm_1 = nn.LSTM(self.emb_size, self.hidden_size, bidirectional=True, batch_first=True, num_layers=2)
-        #self.lstm_2 = nn.LSTM(self.hidden_size * 2, self.hidden_size * 2 + 8, bidirectional=True, batch_first=True)
 
         self.fst_h_1 = th.randn(4, batch_size, self.hidden_size)
         self.fst_c_1 = th.randn(4, batch_size, self.hidden_size)
 
-        #self.fst_h_2 = th.randn(2, batch_size, self.hidden_size * 2 + 8)
-        #self.fst_c_2 = th.randn(2, batch_size, self.hidden_size * 2 + 8)
-
-        #self.lin = nn.Linear((self.hidden_size * 2 + 8) * 2, self.out_class)
-        self.dense = nn.Sequential(nn.Linear(self.hidden_size * 2, self.hidden_size * 6),
+        self.dense = nn.Sequential(nn.Linear(self.hidden_size * 2, self.hidden_size * 3),
                                    nn.ReLU(),
-                                   nn.Linear(self.hidden_size * 6, out_class),
+                                   nn.Linear(self.hidden_size * 3, out_class),
                                    nn.ReLU())
 
     def forward(self, x):
-        s = x.size(0)
-        o1, _ = self.lstm_1(x, (self.fst_h_1[:, :s, :], self.fst_c_1[:, :s, :]))
-        #o2, _ = self.lstm_2(o1, (self.fst_h_2[:, :s, :], self.fst_c_2[:, :s, :]))
-        o3 = self.dense(o1)
-        return o3
+        batch_size = x.size(0)
+        o1, _ = self.lstm_1(x, (self.fst_h_1[:, :batch_size, :], self.fst_c_1[:, :batch_size, :]))
+        o2 = self.dense(o1)
+        return o2
 
 
 class ConvModel(nn.Module):
-    def __init__(self, out_channels, emb_size=16):
+    def __init__(self, out_channels, emb_size=128):
         super(ConvModel, self).__init__()
         self.emb_size = emb_size
         self.out_channels = out_channels
@@ -101,10 +95,6 @@ class SuperNN(nn.Module):
         self.lstm = DoubleLSTM(seq_length, batch_size, word_out_class)
         self.conv = ConvModel(word_out_class)
 
-        #self.drop = nn.Dropout(0.7)
-
-        #self.act_word_pred = nn.Softmax(dim=2)
-
         self.seq_pred = nn.Linear(self.size_seq_pred, seq_out_class)
 
     def forward(self, x):
@@ -113,9 +103,7 @@ class SuperNN(nn.Module):
         out_conv = self.conv(embedded).permute(0, 2, 1)
 
         out_concat = th.cat((out_lstm, out_conv), 1).view(-1, self.size_seq_pred)
-        #out_concat = self.drop(out_concat)
 
-        #out_word_pred = self.act_word_pred(out_lstm)
         out_seq_pred = self.seq_pred(out_concat)
 
         return out_lstm, out_seq_pred

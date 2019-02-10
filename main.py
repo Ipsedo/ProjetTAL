@@ -81,9 +81,6 @@ if __name__ == "__main__":
 
             loss_ints = loss_fn_ints(out_ints, y_ints)
 
-            # optim.step()
-
-            # optim.zero_grad()
             index = y_ners != voc_ners[prep_data.padding_ners]
             loss_ners = loss_fn_ners(out_ners.view(-1, len(voc_ners))[index, :], y_ners[index])
 
@@ -92,7 +89,7 @@ if __name__ == "__main__":
 
             sum_loss_ints += loss_ints.item()
             sum_loss_ners += loss_ners.item()
-        print("Epoch %s, loss_ints = %f, loss_ners = %f" % (e, sum_loss_ints / nb_batch, sum_loss_ners / nb_batch))
+        print("Epoch %s, loss_ners = %f, loss_ints = %f" % (e, sum_loss_ners / nb_batch, sum_loss_ints / nb_batch))
 
         m.eval()
         sum_ints = 0
