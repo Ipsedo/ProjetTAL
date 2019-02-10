@@ -2,8 +2,8 @@ import numpy as np
 import torch as th
 
 
-padding_sents = "<pad>"
-padding_ners = "O"
+padding_sents = "<pad_word>"
+padding_ners = "<pad_ners>"
 
 
 def make_vocab(sents):
