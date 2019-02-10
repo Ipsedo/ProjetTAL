@@ -53,7 +53,7 @@ if __name__ == "__main__":
     print(Y_ners.size())
 
     nb_epoch = 10
-    batch_size = 32
+    batch_size = 16
     nb_batch = int(X_train.size(0) / batch_size)
 
     #m = ModelConv(len(voc_sents), max_len_sents, nb_ints, voc_sents[prep_data.padding_sents])
@@ -80,15 +80,14 @@ if __name__ == "__main__":
             out_ners, out_ints = m(x)
 
             loss_ints = loss_fn_ints(out_ints, y_ints)
-            loss_ints.backward(retain_graph=True)
 
             # optim.step()
 
             # optim.zero_grad()
             index = y_ners != voc_ners[prep_data.padding_ners]
             loss_ners = loss_fn_ners(out_ners.view(-1, len(voc_ners))[index, :], y_ners[index])
-            loss_ners.backward()
 
+            th.sum(loss_ints + loss_ners).backward()
             optim.step()
 
             sum_loss_ints += loss_ints.item()
