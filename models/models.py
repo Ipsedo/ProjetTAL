@@ -4,7 +4,7 @@ import torch.nn as nn
 
 class ModelConv_old(nn.Module):
     def __init__(self, vocab_size, sent_max_len, nb_class, pad_idx):
-        super(ModelConv, self).__init__()
+        super(ModelConv_old, self).__init__()
 
         self.emb = nn.Embedding(vocab_size, 32, padding_idx=pad_idx)
 
@@ -76,7 +76,7 @@ class ConvModel(nn.Module):
         self.out_channels = out_channels
         self.seq_length = seq_length
         self.seq = nn.Sequential(nn.Conv1d(self.emb_size, self.out_channels, kernel_size=3),
-                                 nn.MaxPool1d(seq_length - 2))
+                                 nn.MaxPool1d(3, 2))
 
     def forward(self, x):
         x = x.permute(0, 2, 1)
@@ -88,11 +88,13 @@ class SuperNN(nn.Module):
     def __init__(self, seq_length, vocab_size, batch_size, word_out_class, seq_out_class, padding_idx):
         super(SuperNN, self).__init__()
 
-        self.size_seq_pred = (seq_length + 1) * word_out_class
+        self.size_seq_pred = (seq_length + 48) * word_out_class
 
         self.emb = Embedding(vocab_size, padding_idx)
         self.lstm = DoubleLSTM(seq_length, batch_size, word_out_class)
         self.conv = ConvModel(seq_length, word_out_class)
+
+        #self.drop = nn.Dropout(0.7)
 
         self.act_word_pred = nn.Softmax(dim=2)
 
@@ -105,8 +107,9 @@ class SuperNN(nn.Module):
         out_conv = self.conv(embedded).permute(0, 2, 1)
 
         out_concat = th.cat((out_lstm, out_conv), 1).view(-1, self.size_seq_pred)
+        #out_concat = self.drop(out_concat)
 
         out_word_pred = self.act_word_pred(out_lstm)
         out_seq_pred = self.seq_pred(out_concat)
 
-        return  out_word_pred, out_seq_pred
+        return out_word_pred, out_seq_pred
