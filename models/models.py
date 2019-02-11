@@ -223,6 +223,7 @@ class SuperNN(nn.Module):
         out_lstm = self.lstm(embedded)
 
         # Ainsi que celle du modèle à convolutions
+        # On remet l'ordre des dimension pour coller à (batch, seq, word_out_class)
         out_conv = self.conv(embedded).permute(0, 2, 1)
 
         # Les deux résultats (LSTM + Conv) sont concaténés et mis à plat (ravel)
