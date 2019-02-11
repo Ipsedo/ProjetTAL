@@ -18,9 +18,12 @@ max_len_sents = 100
 
 sents, ners = prep_data.padd_sents_ners(max_len_sents, sents, ners)
 
-voc_sents = prep_data.make_vocab(sents)
-voc_ners = prep_data.make_vocab(ners)
-voc_ints = prep_data.make_vocab_ints(ints)
+# Get the vocab created during training session
+vocab = 'vocab.pkl'
+open_vocab = open(vocab, 'rb')
+voc_sents = pickle.load(open_vocab)
+voc_ners = pickle.load(open_vocab)
+voc_ints = pickle.load(open_vocab)
 
 sents_idx = prep_data.word_to_idx(voc_sents, sents)
 ners_idx = prep_data.word_to_idx(voc_ners, ners)
@@ -34,34 +37,25 @@ X = prep_data.to_long_tensor(sents_idx)
 Y_ints = prep_data.to_long_tensor(ints_idx)
 Y_ners = prep_data.to_long_tensor(ners_idx)
 
-print(X.size(0))
+nb_test = X.size(0) - (4478 + 500)
 
-nb_test = 3500+1371
-
-print(nb_test)
-
-X_test = X[nb_test:]
-Y_ints_test = Y_ints[nb_test:]
-Y_ners_test = Y_ners[nb_test:]
-
-print(X_test.size())
-print(Y_ints_test.size())
-print(Y_ners_test.size())
+X_test = X[-nb_test:]
+Y_ints_test = Y_ints[-nb_test:]
+Y_ners_test = Y_ners[-nb_test:]
 
 #Get the trained model
-
 backup_model = "backup_model.pkl"
 open_backup = open(backup_model, 'rb')
 m = pickle.load(open_backup)
-print(m)
 
 m.eval()
 sum_ints = 0
 sum_ners = 0
 batch_size = 32
 
-nb_batch_test = int(1000 / batch_size)
+nb_batch_test = int(nb_test / batch_size)
 
+# Loop for test
 for i in tqdm(range(nb_batch_test)):
     i_min = i * batch_size
     i_max = (i + 1) * batch_size
@@ -88,6 +82,6 @@ for i in tqdm(range(nb_batch_test)):
     sum_ints += nb_correct_ints
     sum_ners += nb_correct_ners
 
-print("Test results : ners = %f, ints = %f" % (sum_ners / nb_batch_test, sum_ints / 1000))
+print("Test results : ners = %f, ints = %f" % (sum_ners / nb_batch_test, sum_ints / nb_test))
 
 
