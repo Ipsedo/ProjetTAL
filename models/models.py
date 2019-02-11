@@ -226,6 +226,7 @@ class SuperNN(nn.Module):
         out_conv = self.conv(embedded).permute(0, 2, 1)
 
         # Les deux résultats (LSTM + Conv) sont concaténés et mis à plat (ravel)
+        # -1 pour la taille de batch
         out_concat = th.cat((out_lstm, out_conv), 1).view(-1, self.size_seq_pred)
 
         # On applique la couche linéaire pour la predictions de phrases
