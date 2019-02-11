@@ -3,8 +3,15 @@ import data.prepare_data as prep_data
 from models.models import SuperNN
 import torch as th
 import torch.nn as nn
+import sys
 
 if __name__ == "__main__":
+
+    use_cuda = False
+    if len(sys.argv) > 1:
+        if sys.argv[1] == "cuda":
+            use_cuda = True
+
     sents, ners, ints = load_file.readatis('data-atis/all_atis.iob')
 
     nb_ints = len(set(ints))
@@ -52,14 +59,20 @@ if __name__ == "__main__":
     print(Y_ints.size())
     print(Y_ners.size())
 
-    nb_epoch = 10
-    batch_size = 16
+    nb_epoch = 20
+    batch_size = 32
     nb_batch = int(X_train.size(0) / batch_size)
 
     #m = ModelConv(len(voc_sents), max_len_sents, nb_ints, voc_sents[prep_data.padding_sents])
     m = SuperNN(max_len_sents, len(voc_sents), batch_size, len(voc_ners), len(voc_ints), voc_sents[prep_data.padding_sents])
     loss_fn_ints = nn.CrossEntropyLoss()
     loss_fn_ners = nn.CrossEntropyLoss()
+
+    if use_cuda:
+        m.cuda()
+        loss_fn_ners.cuda()
+        loss_fn_ints.cuda()
+
     optim = th.optim.Adagrad(m.parameters(), lr=1e-3)
 
     for e in range(nb_epoch):
@@ -75,6 +88,9 @@ if __name__ == "__main__":
             y_ints = Y_ints_train[i_min:i_max]
             y_ners = Y_ners_train[i_min:i_max].view(-1)
 
+            if use_cuda:
+                x, y_ints, y_ners = x.cuda(), y_ints.cuda(), y_ners.cuda()
+
             optim.zero_grad()
 
             out_ners, out_ints = m(x)
@@ -87,8 +103,8 @@ if __name__ == "__main__":
             th.sum(loss_ints + loss_ners).backward()
             optim.step()
 
-            sum_loss_ints += loss_ints.item()
-            sum_loss_ners += loss_ners.item()
+            sum_loss_ints += loss_ints.cpu().item()
+            sum_loss_ners += loss_ners.cpu().item()
         print("Epoch %s, loss_ners = %f, loss_ints = %f" % (e, sum_loss_ners / nb_batch, sum_loss_ints / nb_batch))
 
         m.eval()
@@ -106,6 +122,9 @@ if __name__ == "__main__":
             ners = Y_ners_dev[i_min:i_max].view(-1)
             ints = Y_ints_dev[i_min:i_max]
 
+            if use_cuda:
+                x, ners, ints = x.cuda(), ners.cuda(), ints.cuda()
+
             out_ners, out_ints = m(x)
 
             out_ners = out_ners.view(-1, len(voc_ners)).argmax(dim=1)
@@ -113,9 +132,9 @@ if __name__ == "__main__":
 
             index = ners != voc_ners[prep_data.padding_ners]
             tmp = out_ners[index] == ners[index]
-            nb_correct_ners = tmp.sum().item() / ners[index].size(0)
+            nb_correct_ners = tmp.sum().cpu().item() / ners[index].size(0)
 
-            nb_correct_ints = (out_ints == ints).sum().item()
+            nb_correct_ints = (out_ints == ints).sum().cpu().item()
 
             sum_ints += nb_correct_ints
             sum_ners += nb_correct_ners

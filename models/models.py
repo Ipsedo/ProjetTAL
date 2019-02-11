@@ -30,8 +30,12 @@ class ModelConv_old(nn.Module):
         return out
 
 
+embedding_size = 512
+hidden_lstm_size = 256
+
+
 class Embedding(nn.Module):
-    def __init__(self, vocab_size, padding_idx, emb_size=128):
+    def __init__(self, vocab_size, padding_idx, emb_size=embedding_size):
         super(Embedding, self).__init__()
         self.emb_size = emb_size
         self.vocab_size = vocab_size
@@ -42,7 +46,7 @@ class Embedding(nn.Module):
 
 
 class DoubleLSTM(nn.Module):
-    def __init__(self, seq_length, batch_size, out_class, emb_size=128, hidden_size=64):
+    def __init__(self, seq_length, batch_size, out_class, emb_size=embedding_size, hidden_size=hidden_lstm_size):
         super(DoubleLSTM, self).__init__()
 
         self.seq_length = seq_length
@@ -50,25 +54,32 @@ class DoubleLSTM(nn.Module):
         self.hidden_size = hidden_size
         self.out_class = out_class
 
-        self.lstm_1 = nn.LSTM(self.emb_size, self.hidden_size, bidirectional=True, batch_first=True, num_layers=2)
+        self.lstm_1 = nn.LSTM(self.emb_size, self.hidden_size, bidirectional=True, batch_first=True, num_layers=2, dropout=0.3)
 
         self.fst_h_1 = th.randn(4, batch_size, self.hidden_size)
         self.fst_c_1 = th.randn(4, batch_size, self.hidden_size)
 
-        self.dense = nn.Sequential(nn.Linear(self.hidden_size * 2, self.hidden_size * 3),
+        self.dense = nn.Sequential(nn.Linear(self.hidden_size * 2, self.hidden_size * 6),
                                    nn.ReLU(),
-                                   nn.Linear(self.hidden_size * 3, out_class),
+                                   nn.Linear(self.hidden_size * 6, out_class),
                                    nn.ReLU())
 
     def forward(self, x):
         batch_size = x.size(0)
-        o1, _ = self.lstm_1(x, (self.fst_h_1[:, :batch_size, :], self.fst_c_1[:, :batch_size, :]))
+
+        h = self.fst_h_1[:, :batch_size, :]
+        c = self.fst_c_1[:, :batch_size, :]
+
+        if x.is_cuda:
+            h, c = h.cuda(), c.cuda()
+
+        o1, _ = self.lstm_1(x, (h, c))
         o2 = self.dense(o1)
         return o2
 
 
 class ConvModel(nn.Module):
-    def __init__(self, out_channels, emb_size=128):
+    def __init__(self, out_channels, emb_size=embedding_size):
         super(ConvModel, self).__init__()
         self.emb_size = emb_size
         self.out_channels = out_channels
