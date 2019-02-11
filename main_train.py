@@ -29,6 +29,14 @@ if __name__ == "__main__":
     voc_ners = prep_data.make_vocab(ners)
     voc_ints = prep_data.make_vocab_ints(ints)
 
+    # Backup of vocabulary
+    vocab_backup = 'vocab.pkl'
+    vocab_b_open = open(vocab_backup, 'wb')
+    pickle.dump(voc_sents, vocab_b_open)
+    pickle.dump(voc_ners, vocab_b_open)
+    pickle.dump(voc_ints, vocab_b_open)
+    vocab_b_open.close()
+
     print(len(voc_sents))
     print(len(voc_ners))
 
@@ -47,8 +55,8 @@ if __name__ == "__main__":
     Y_ints = prep_data.to_long_tensor(ints_idx)
     Y_ners = prep_data.to_long_tensor(ners_idx)
 
-    nb_train = 3500
-    nb_dev = 1371
+    nb_train = 4478
+    nb_dev = 500
 
     X_train = X[:nb_train]
     Y_ints_train = Y_ints[:nb_train]
@@ -62,7 +70,7 @@ if __name__ == "__main__":
     print(Y_ints.size())
     print(Y_ners.size())
 
-    nb_epoch = 10
+    nb_epoch = 15
     batch_size = 32
     nb_batch = int(X_train.size(0) / batch_size)
 
@@ -144,6 +152,7 @@ if __name__ == "__main__":
 
         print("Dev results : ners = %f, ints = %f" % (sum_ners / nb_batch_dev, sum_ints / nb_dev))
 
+    #Backup of model
     backup_model = "backup_model.pkl"
     open_backup = open(backup_model, 'wb')
     pickle.dump(m, open_backup)
