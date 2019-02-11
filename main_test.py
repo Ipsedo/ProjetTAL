@@ -7,81 +7,98 @@ from tqdm import tqdm
 import pickle
 import sys
 
-use_cuda = False
-if len(sys.argv) > 1:
-    if sys.argv[1] == "cuda":
-        use_cuda = True
+if __name__ == "__main__":
 
-sents, ners, ints = load_file.readatis('data-atis/all_atis.iob')
+    # UTilisation de CUDA ou non
+    use_cuda = False
+    if len(sys.argv) > 1:
+        if sys.argv[1] == "cuda":
+            use_cuda = True
 
-max_len_sents = 100
+    # Chargement des données
+    sents, ners, ints = load_file.readatis('data-atis/all_atis.iob')
 
-sents, ners = prep_data.padd_sents_ners(max_len_sents, sents, ners)
+    max_len_sents = 100
 
-# Get the vocab created during training session
-vocab = 'vocab.pkl'
-open_vocab = open(vocab, 'rb')
-voc_sents = pickle.load(open_vocab)
-voc_ners = pickle.load(open_vocab)
-voc_ints = pickle.load(open_vocab)
+    sents, ners = prep_data.padd_sents_ners(max_len_sents, sents, ners)
 
-sents_idx = prep_data.word_to_idx(voc_sents, sents)
-ners_idx = prep_data.word_to_idx(voc_ners, ners)
-ints_idx = prep_data.intents_to_idx(voc_ints, ints)
+    # Chargement des vocabulaires créent pendant la phase d'apprentissage
+    vocab = 'vocab.pkl'
+    open_vocab = open(vocab, 'rb')
+    voc_sents = pickle.load(open_vocab)
+    voc_ners = pickle.load(open_vocab)
+    voc_ints = pickle.load(open_vocab)
 
-sents_idx = prep_data.to_numpy(sents_idx)
-ners_idx = prep_data.to_numpy(ners_idx)
-ints_idx = prep_data.to_numpy(ints_idx)
+    # Passage vers indices
+    sents_idx = prep_data.word_to_idx(voc_sents, sents)
+    ners_idx = prep_data.word_to_idx(voc_ners, ners)
+    ints_idx = prep_data.intents_to_idx(voc_ints, ints)
 
-X = prep_data.to_long_tensor(sents_idx)
-Y_ints = prep_data.to_long_tensor(ints_idx)
-Y_ners = prep_data.to_long_tensor(ners_idx)
+    # Passage vers numpy
+    sents_idx = prep_data.to_numpy(sents_idx)
+    ners_idx = prep_data.to_numpy(ners_idx)
+    ints_idx = prep_data.to_numpy(ints_idx)
 
-nb_test = X.size(0) - (4478 + 500)
+    # Passage de numpy.ndarray vers torch.Tensor
+    X = prep_data.to_long_tensor(sents_idx)
+    Y_ints = prep_data.to_long_tensor(ints_idx)
+    Y_ners = prep_data.to_long_tensor(ners_idx)
 
-X_test = X[-nb_test:]
-Y_ints_test = Y_ints[-nb_test:]
-Y_ners_test = Y_ners[-nb_test:]
+    # Nombre de données de test
+    nb_test = X.size(0) - (4478 + 500)
 
-#Get the trained model
-backup_model = "backup_model.pkl"
-open_backup = open(backup_model, 'rb')
-m = pickle.load(open_backup)
+    # Récupération des données de test
+    X_test = X[-nb_test:]
+    Y_ints_test = Y_ints[-nb_test:]
+    Y_ners_test = Y_ners[-nb_test:]
 
-m.eval()
-sum_ints = 0
-sum_ners = 0
-batch_size = 32
+    # Chargement du modèle déjà entrainé
+    backup_model = "backup_model.pkl"
+    open_backup = open(backup_model, 'rb')
+    m = pickle.load(open_backup)
 
-nb_batch_test = int(nb_test / batch_size)
+    m.eval()
+    sum_ints = 0
+    sum_ners = 0
+    batch_size = 32
 
-# Loop for test
-for i in tqdm(range(nb_batch_test)):
-    i_min = i * batch_size
-    i_max = (i + 1) * batch_size
-    i_max = i_max if i_max < X_test.size(0) else X_test.size(0)
+    nb_batch_test = int(nb_test / batch_size)
 
-    x = X_test[i_min:i_max]
-    ners = Y_ners_test[i_min:i_max].view(-1)
-    ints = Y_ints_test[i_min:i_max]
+    # Boucle pour iterer sur les batch de test
+    for i in tqdm(range(nb_batch_test)):
+        # Bornes du batch
+        i_min = i * batch_size
+        i_max = (i + 1) * batch_size
+        i_max = i_max if i_max < X_test.size(0) else X_test.size(0)
 
-    if use_cuda:
-        x, ners, ints = x.cuda(), ners.cuda(), ints.cuda()
+        # Récupération du batch
+        x = X_test[i_min:i_max]
+        ners = Y_ners_test[i_min:i_max].view(-1)
+        ints = Y_ints_test[i_min:i_max]
 
-    out_ners, out_ints = m(x)
+        # Passage vers CUDA
+        if use_cuda:
+            x, ners, ints = x.cuda(), ners.cuda(), ints.cuda()
 
-    out_ners = out_ners.view(-1, len(voc_ners)).argmax(dim=1)
-    out_ints = out_ints.argmax(dim=1)
+        # Prédiction du modèle
+        out_ners, out_ints = m(x)
 
-    index = ners != voc_ners[prep_data.padding_ners]
-    tmp = out_ners[index] == ners[index]
-    nb_correct_ners = tmp.sum().cpu().item() / ners[index].size(0)
+        # On récupère l'argmax pour obtenir la prédiction
+        out_ners = out_ners.view(-1, len(voc_ners)).argmax(dim=1)
+        out_ints = out_ints.argmax(dim=1)
 
-    nb_correct_ints = (out_ints == ints).sum().cpu().item()
+        # Filtrage des mots de padding
+        index = ners != voc_ners[prep_data.padding_ners]
+        # Nombre de bonnes réponses pour les ners
+        tmp = out_ners[index] == ners[index]
+        nb_correct_ners = tmp.sum().cpu().item() / ners[index].size(0)
 
-    sum_ints += nb_correct_ints
-    sum_ners += nb_correct_ners
+        # Nombre de bonnes réponses pour les intents
+        nb_correct_ints = (out_ints == ints).sum().cpu().item()
 
-print("Test results : ners = %f, ints = %f" % (sum_ners / nb_batch_test, sum_ints / nb_test))
+        sum_ints += nb_correct_ints
+        sum_ners += nb_correct_ners
+
+    print("Test results : ners = %f, ints = %f" % (sum_ners / nb_batch_test, sum_ints / nb_test))
 
 
