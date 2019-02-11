@@ -88,6 +88,6 @@ for i in tqdm(range(nb_batch_test)):
     sum_ints += nb_correct_ints
     sum_ners += nb_correct_ners
 
-print("Test results : ners = %f, ints = %f" % (sum_ners / nb_batch_test, sum_ints / nb_test))
+print("Test results : ners = %f, ints = %f" % (sum_ners / nb_batch_test, sum_ints / 1000))
 
 
